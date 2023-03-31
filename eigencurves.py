@@ -22,6 +22,7 @@ from scipy.optimize import leastsq
 import pdb
 from scipy import stats
 from scipy import special
+#test
 
 def mpmodel(p,x,y,z,elc,escore,nparams):#fjac=None,x=None,y=None,err=None):
 	model = p[0]*elc[0,:] + p[1]
