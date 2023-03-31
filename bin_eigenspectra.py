@@ -1,38 +1,70 @@
 import numpy as np
-import pdb
 
-
-def bin_eigenspectra(spectra, kgroups):
+def bin_eigenspectra(maps, kgroup_draws, lats, lons, ngroups):
     '''
     Converts a grid of spectra into eigenspectra defined by kgroups.
 
     Parameters
     ----------
-    spectra : array of Fp/Fs (axes: wavelengths x lat x lon)
-    kgroups : array of group indices (ints) from 0 to k-1 (axes: lat x lon)
+    maps : array of retrieved maps, units scaled Fp/Fs 
+        (axes: number of samples from fitting x wavelengths x latitude x longitude)
+    kgroup_draws : grouping for each retrieved map, unitless 
+        (axes: number of samples from fitting x latitude x longitude)
+    lats : array of latitude, units radians (axes: latitude x longitude)
+    lons : array of longitude, units radians (axes: latitude x longitude)
+    ngroups : number of groups to bin into, unitless
 
     Returns
     -------
-    eigenspectra : list of k spectra, averaged over each group
+    integratedspec : spectra of each identified group, scaled to a full eclipse depth
+        as if that spectrum covered an entire dayside hemisphere. Units: Fp/Fs
+        (axes: number of groups x wavelength)
+    integratederr : error of each identified group, scaled to a full eclipse depth
+        as if that spectrum covered an entire dayside hemisphere. Units: Fp/Fs
+        (axes: number of groups x wavelength)
+    nearestint : array identifying the group each point was sorted into, unitless
+        (axes: latitude x longitude)
     '''
 
-    # Calculate the number of groups
-    # assuming kgroups contains integers from 0 to ngroups
-    ngroups = np.max(kgroups)+1
+    #Find integer group each point is sorted into most frequently
+    kgroups = np.mean(kgroup_draws, axis=0)
+    nearestint= np.round(kgroups,decimals=0)
 
-    nbins = spectra.shape[0]  # number of wavelength bins
-    spectra = spectra.reshape(nbins, -1)  # Flatten over (lat x lon)
-    kgroups = kgroups.reshape(-1)
-
-    eigenspectra = []
-    eigenlist = [[]]*ngroups
+    #Calculate mean and std of spectrum at each lat/long point
+    perpointspec = np.mean(maps,axis=0)
+    perpointerr = np.std(maps,axis=0)
+    
+    #Use an area weighting to get mean spectrum of each group
+    nwaves=np.shape(maps)[1]
+    eigenspec = np.zeros((ngroups,nwaves))
+    eigenerr = np.zeros((ngroups,nwaves))
     for g in range(ngroups):
-        ingroup = (kgroups == g).astype(int)
-        eigenspec = np.sum(spectra*ingroup, axis=1)/np.sum(ingroup)
-        # eigenspec is the mean of spectra in group
-        eigenspectra.append(eigenspec)
-        ingroups2 = (kgroups == g)
-        eigenlist[g]=spectra[:,ingroups2]
+        ingroup = np.where(nearestint==g)
+        if len(ingroup[0])==0:
+            eigenspec[g,:] = np.zeros(nwaves)
+            eigenerr[g,:] = np.zeros(nwaves)
+        else:
+            eigenspec[g,:] = np.sum(perpointspec[:,ingroup[0],ingroup[1]] * \
+                np.cos(lats[ingroup[0],ingroup[1]]),axis=1)/np.sum(np.cos(lats[ingroup[0],ingroup[1]]))
+            eigenerr[g,:] = np.sum(perpointerr[:,ingroup[0],ingroup[1]] * \
+                np.cos(lats[ingroup[0],ingroup[1]]),axis=1)/np.sum(np.cos(lats[ingroup[0],ingroup[1]]))
 
-    return eigenspectra,eigenlist
+    #integrate over full sphere to get spectra as if observing a full planet covered
+    #by that spectrum
+    centlon=0.
+    centlat=0.
+    dellat=np.diff(lats[:,0])[0]
+    dellon=np.diff(lons[0,:])[0]
+    centlat_sin = np.sin(centlat)
+    centlat_cos = np.cos(centlat)
+    vis = centlat_sin * np.sin(lats) + centlat_cos * np.cos(lats) * \
+            np.cos(lons - centlon)
+    vis[vis <= 0.] = 0.
+    integratedspec = np.zeros((ngroups,nwaves))
+    integratederr = np.zeros((ngroups,nwaves))
+    for g in range(ngroups):
+        integratedspec[g,:] = eigenspec[g,:]*np.sum(vis*np.cos(lats)) * dellat * dellon
+        integratederr[g,:] = eigenerr[g,:]*np.sum(vis*np.cos(lats)) * dellat * dellon
+
+    return integratedspec,integratederr,nearestint
 
