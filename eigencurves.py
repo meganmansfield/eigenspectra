@@ -30,6 +30,9 @@ def mpmodel(p,x,y,z,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs):
 def quantile(x, q):
 	return np.percentile(x, [100. * qi for qi in q])
 
+def neg_lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
+	return -lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True)
+
 def lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
 	lp=lnprior(theta)
 	if not np.isfinite(lp):
@@ -195,11 +198,16 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 	else:
 		assert (np.shape(fluxes)[0]==np.shape(times)[0]) | (np.shape(fluxes)[0]==np.shape(waves)[0]),"Flux array dimension must match wavelength and time arrays."
 
-	nParamsUsed = np.zeros(len(waves))
+	if not prefit:
+		eigencurvecoeffList = []
+		nParamsUsed = np.zeros(len(waves))
+		ecoeffList, escoreList,elatentList = [], [], []
+		fullchainarray=[]
+	else:
+		eigencurvecoeffList=np.zeros((np.shape(waves)[0],(nsteps-burnin)*nwalkers,int(afew+2)))
+	
 	biclist=np.zeros(len(waves))
-	ecoeffList, escoreList,elatentList = [], [], []
-	fullchainarray=[]
-	eigencurvecoeffList = []
+	
 	elclist=[]
 	for counter in np.arange(np.shape(waves)[0]): #loop through each wavelength
 		wavelength=waves[counter] #wavelength this secondary eclipse is for
@@ -250,9 +258,17 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 				params0=np.zeros(nparams)
 				params0[0]=0.0005
 				params0[1]=1.
+				params0[3]=0.0001
 				if verbose:
 					print(check_negative(degree,params0,ecoeff,wavelength,extent))
-				mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
+				#mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
+				
+				results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+					eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+					extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+				options={'maxiter':None})
+				fit_params = results.x
+				#FINDME
 				resid=mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
 				if plot:
 					throwaway=makeplot(degree,mpfit[0],ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
@@ -269,6 +285,7 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 						params0=np.zeros(nparams)
 						params0[0]=0.0005
 						params0[1]=1.
+						params0[3]=0.0001
 						if verbose:
 							print(check_negative(degree,params0,ecoeff,wavelength,extent))
 						mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
@@ -279,6 +296,7 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 						params0=np.zeros(nparams)
 						params0[0]=0.0005
 						params0[1]=1.
+						params0[3]=0.0001
 						if verbose:
 							print(check_negative(degree,params0,ecoeff,wavelength,extent))
 						mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
@@ -311,6 +329,7 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 		params0=np.zeros(nparams)
 		params0[0]=0.0005
 		params0[1]=1.
+		params0[3]=0.0001
 
 		if verbose:
 			print(check_negative(degree,params0,ecoeff,wavelength,extent))
