@@ -149,14 +149,28 @@ def makeplot(degree,fitparams,ecoeff,planetparams,eclipsetimes,eclipsefluxes,ecl
 	return templc
 
 def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1000,strict=True,nonegs=True):
+	
+	#unpack data dictionary
 	waves=dict['wavelength (um)']
 	times=dict['time (days)']
 	fluxes=dict['flux (ppm)']	#2D array times, waves
 	errors=dict['flux err (ppm)']
+
+	#unpack parameters dictionary
+	t0=planetparams['t0']
+	per=planetparams['per']
+	a_abs=planetparams['a_abs']
+	inc=planetparams['inc']
+	ecc=planetparams['ecc']
+	planetw=planetparams['w']
+	rprs=planetparams['rprs']
+	ars=planetparams['ars']
+
+	extent=np.zeros(2)
+	extent[0]=(np.min(times)-t0)/per*2.*np.pi-np.pi/2.-np.pi
+	extent[1]=(np.max(times)-t0)/per*2.*np.pi+np.pi/2.-np.pi
 	
-	burnin=200
-	nsteps=1000
-	nwalkers=32 #number of walkers	
+	nwalkers=100 #number of walkers, hard coded in for now
 	
 	
 	#This file is going to be a 3D numpy array 
