@@ -1,42 +1,43 @@
 #Function to fit a map at each wavelength using Eigencurves
 
-#THINGS THAT WILL BE UPDATED IN FUTURE VERSIONS:
-#	1. Right now it just loads in a single file, and for the entire pipeline it will load in a file for each wavelength and run the fit for each wavelength
-#	2. It will eventually output wavelengths in addition to the spherical harmonic coefficients
-#	3. Right now it just selects a number of eigencurves to include. Will eventually optimize this from chi-squared.
-
 #INPUTS:
 #	Secondary eclipse light curves at each wavelength (csv for each wavelength)
 
 #OUTPUTS:
 #	Coefficients for each of the spherical harmonics
-#from lightcurves_sh_starry import sh_lcs
+
 from lightcurves_sh import sh_lcs
 from pca_eig import princomp
 import numpy as np 
 import matplotlib.pyplot as plt 
 import emcee
-import csv
 import spiderman as sp
 from scipy.optimize import leastsq
 import pdb
-from scipy import stats
-from scipy import special
+from matplotlib import rc
+import eigenmaps
+import multiprocessing as mp
 
-def mpmodel(p,x,y,z,elc,escore,nparams):#fjac=None,x=None,y=None,err=None):
-	model = p[0]*elc[0,:] + p[1]
-	for ind in range(2,nparams): #FINDME changed to go to nparams+1
-		model = model + p[ind] * escore[ind-2,:]
+def mpmodel(p,x,y,z,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs):
+	#Create model lightcurve and calculate residuals
+	model = lightcurve_model(p,elc,escore,nparams)
+	if nonegs:
+		isnegative,minval = check_negative(degree,p,ecoeff,wavelength,extent)
+		if isnegative:
+			model = -np.ones(np.shape(y))
 	return np.array(y-model)
 
-def lnprob(theta,x,y,yerr,elc,escore,nparams):
-	lp=lnprior(theta,nparams)
-	return lp+lnlike(theta,x,y,yerr,elc,escore,nparams)
+def lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
+	lp=lnprior(theta)
+	return lp+lnlike(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs)
 
-def lnlike(theta,x,y,yerr,elc,escore,nparams):
-	model = theta[0] * elc[0,:] + theta[1]
-	for ind in range(2,nparams): #FINDME changed to go to nparams+1
-		model = model + theta[ind] * escore[ind-2,:]
+def lnlike(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
+	#Create model lightcurve and calculate likelihood
+	model = lightcurve_model(theta,elc,escore,nparams)
+	if nonegs:
+		isnegative,minval = check_negative(degree,theta,ecoeff,wavelength,extent)
+		if isnegative:
+			model = -np.ones(np.shape(y))
 	resid=y-model
 	chi2=np.sum((resid/yerr)**2)
 	dof=np.shape(y)[0]-1.
@@ -44,7 +45,7 @@ def lnlike(theta,x,y,yerr,elc,escore,nparams):
 	ln_likelihood=-0.5*(np.sum((resid/yerr)**2 + np.log(2.0*np.pi*(yerr)**2)))
 	return ln_likelihood
 
-def lnprior(theta,nparams):
+def lnprior(theta):
 	lnpriorprob=0.
 	c0 = theta[0]
 	fstar = theta[1]
@@ -52,9 +53,102 @@ def lnprior(theta,nparams):
 		lnpriorprob=-np.inf
 	elif c0<0.:
 		lnpriorprob=-np.inf
+	elif c0>1.:
+		lnpriorprob=-np.inf
+	elif fstar>2.:
+		lnpriorprob=-np.inf
+	for param in theta[2:]:
+		if abs(param)>1.:
+			lnpriorprob=-np.inf
 	return lnpriorprob
 
-def eigencurves(dict,plot=False,degree=3,afew=5):
+def lightcurve_model(p,elc,escore,nparams):
+	#Compute light curve from model parameters
+	model = p[0]*elc[0,:] + p[1]
+	for ind in range(2,nparams):
+		model = model + p[ind] * escore[ind-2,:]
+	return model
+
+def check_negative(degree,fitparams,ecoeff,wavelength,extent):
+	#Check whether the resulting map has any negative values at a resolution of 100 x 100 grid points
+	#Create spherical harmonic coefficients
+	fcoeffs=np.zeros_like(ecoeff)
+	for i in np.arange(np.shape(fitparams)[0]-2):
+		fcoeffs[:,i] = fitparams[i+2]*ecoeff[:,i]
+
+	sphericalcoeffs=np.zeros(int((degree)**2.))
+	for j in range(0,len(fcoeffs)):
+		for i in range(1,int((degree)**2.)):
+			sphericalcoeffs[i] += fcoeffs.T[j,2*i-1]-fcoeffs.T[j,2*(i-1)]
+	sphericalcoeffs[0] = fitparams[0]
+	
+	#Create 2D map
+	londim = 32
+	latdim = 16
+	
+	inputArr=np.zeros([1,sphericalcoeffs.shape[0]+1])
+	inputArr[:,0] = wavelength
+	inputArr[:,1:] = sphericalcoeffs.transpose()
+	wavelengths, lats, lons, maps = eigenmaps.generate_maps(inputArr,N_lon=londim, N_lat=latdim)
+	#only consider visible regions of the planet
+	visible = np.where((lons[0,:]>extent[0])&(lons[0,:]<extent[1]))[0]
+	vismap = maps[0][:,visible]
+	negbool = np.any(vismap<0.)
+	minval = np.min(vismap)
+	return negbool,minval
+
+def makeplot(degree,fitparams,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors):
+	#make a plot to show how well the least squares fit is doing
+	fcoeffs=np.zeros_like(ecoeff)
+	for i in np.arange(np.shape(fitparams)[0]-2):
+		fcoeffs[:,i] = fitparams[i+2]*ecoeff[:,i]
+
+	sphericalcoeffs=np.zeros(int((degree)**2.))
+	for j in range(0,len(fcoeffs)):
+		for i in range(1,int((degree)**2.)):
+			sphericalcoeffs[i] += fcoeffs.T[j,2*i-1]-fcoeffs.T[j,2*(i-1)]
+	sphericalcoeffs[0] = fitparams[0]
+
+	t0=planetparams['t0']
+	per=planetparams['per']
+	a_abs=planetparams['a_abs']
+	inc=planetparams['inc']
+	ecc=planetparams['ecc']
+	planetw=planetparams['w']
+	rprs=planetparams['rprs']
+	ars=planetparams['ars']
+	sparams0=sp.ModelParams(brightness_model='spherical')	#no offset model
+	sparams0.nlayers=20
+
+	sparams0.t0=t0				# Central time of PRIMARY transit [days]
+	sparams0.per=per			# Period [days]
+	sparams0.a_abs=a_abs			# The absolute value of the semi-major axis [AU]
+	sparams0.inc=inc			# Inclination [degrees]
+	sparams0.ecc=ecc			# Eccentricity
+	sparams0.w=planetw			# Argument of periastron
+	sparams0.rp=rprs				# Planet to star radius ratio
+	sparams0.a=ars				# Semi-major axis scaled by stellar radius
+	sparams0.p_u1=0.			# Planetary limb darkening parameter
+	sparams0.p_u2=0.			# Planetary limb darkening parameter
+
+	sparams0.degree=degree	#maximum harmonic degree
+	sparams0.la0=0.
+	sparams0.lo0=0.
+	sparams0.sph=list(sphericalcoeffs)
+
+	times=eclipsetimes
+	templc=sparams0.lightcurve(times)
+
+	sp.plot_square(sparams0)
+
+	plt.figure()
+	plt.plot(times,templc,color='r',zorder=1)
+	plt.errorbar(eclipsetimes,eclipsefluxes,yerr=eclipseerrors,linestyle='none',color='k',zorder=0)
+	plt.show()
+
+	return templc
+
+def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1000,strict=True,nonegs=True):
 	waves=dict['wavelength (um)']
 	times=dict['time (days)']
 	fluxes=dict['flux (ppm)']	#2D array times, waves
