@@ -56,11 +56,11 @@ def sh_lcs(n_layers=20,t0=0,per=2.21857567,a_abs=0.0313,inc=85.71,ecc=0.0,w=90,r
             spider_params.sph= [0] * degree**2
             # set up 2-d array of LCs for all SHs
             for i in range(1,len(spider_params.sph)):
-                spider_params.sph[i]= -1*coeff
+                spider_params.sph[i]= -1*coeff #FINDME: SWITCHED FOR RYAN'S METHOD. USED TO BE NEGATIVE FIRST
                 tlc = spider_params.lightcurve(t)
                 tlc = np.resize(tlc,(1,ntimes))
                 lc = np.append(lc,tlc,axis=0)
-                spider_params.sph[i]= 1*coeff
+                spider_params.sph[i]= 1*coeff #FINDME: SWITCHED FOR RYAN'S METHOD. USED TO BE POSITIVE SECOND
                 tlc = spider_params.lightcurve(t)
                 tlc = np.resize(tlc,(1,ntimes))
                 lc = np.append(lc,tlc,axis=0)

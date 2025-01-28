@@ -24,7 +24,7 @@ def kmeans(fluxmap, k, labels=False):
     kgroups: array of group indices (ints) from 0 to k-1 (axes: lat x lon)
     '''
 
-	# Expects flux maps in the form (lam,lat,long)
+    # Expects flux maps in the form (lam,lat,long)
 
     lamdim = fluxmap.shape[0]
     latdim = fluxmap.shape[1]
@@ -60,7 +60,7 @@ def kmeansBest(fluxmap, n=10):
     k = np.argmax(score)
     return k
 
-def sort_draws(eigenspectra_draws,kgroup_draws,uber_eigenlist,method='avg'):
+def sort_draws(eDraws,kGroup,method='avg'):
     '''
     Take the many different draws and sort the groups so that we avoid
     the sorting problem where the groups are all mixed up from one 
@@ -81,8 +81,8 @@ def sort_draws(eigenspectra_draws,kgroup_draws,uber_eigenlist,method='avg'):
     sortedDraws: a 3D array of spectra for each draw and group
         these will be sorted according to the `method` keyword
     '''
-    eDraws = np.array(eigenspectra_draws)
-    kGroup = np.array(kgroup_draws)
+    # eDraws = np.array(eigenspectra_draws)
+    # kGroup = np.array(kgroup_draws)
     
     if method == 'avg':
         sortValue = np.mean(eDraws,axis=2)
@@ -98,18 +98,17 @@ def sort_draws(eigenspectra_draws,kgroup_draws,uber_eigenlist,method='avg'):
     ## An ascending order array
     ascendingOrder = np.arange(sortArg.shape[1])
     
-    sortedDraws = np.zeros_like(eDraws)
+    # sortedDraws = np.zeros_like(eDraws)
     sortedKgroups = np.zeros_like(kGroup)
-    sortedubereigenlist=[[[[] for i in range(np.shape(uber_eigenlist)[2])] for i in range(np.shape(uber_eigenlist)[1])] for i in range(np.shape(uber_eigenlist)[0])]
+    # sortedubereigenlist=[[[[] for i in range(np.shape(uber_eigenlist)[2])] for i in range(np.shape(uber_eigenlist)[1])] for i in range(np.shape(uber_eigenlist)[0])]
     
-    for ind,oneDraw in enumerate(eDraws):
-        sortedDraws[ind] = oneDraw[sortArg[ind]]
+    for ind in np.arange(np.shape(eDraws)[0]):
+        # sortedDraws[ind] = oneDraw[sortArg[ind]]
         for oneGroup in ascendingOrder:
             pts = kGroup[ind] == oneGroup
             sortedKgroups[ind][pts] = sortArg[ind][oneGroup]
-            for wavenum in range(np.shape(uber_eigenlist)[2]):
-                sortedubereigenlist[ind][np.where(sortArg[ind]==oneGroup)[0][0]][wavenum] = uber_eigenlist[ind][oneGroup][wavenum]
+            # for wavenum in range(np.shape(uber_eigenlist)[2]):
+            #     sortedubereigenlist[ind][np.where(sortArg[ind]==oneGroup)[0][0]][wavenum] = uber_eigenlist[ind][oneGroup][wavenum]
     
-
-    return sortedDraws, sortedKgroups,sortedubereigenlist
+    return sortedKgroups#,sortedubereigenlist sortedDraws, 
     
