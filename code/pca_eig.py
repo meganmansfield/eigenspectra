@@ -3,6 +3,9 @@
 # fyi, python arrays are [rows,columns]
 
 from numpy import mean,cov,cumsum,dot,linalg,size,flipud,argsort
+import sklearn
+import sklearn.decomposition
+import numpy as np
 
 def princomp(A):
   """ performs principal components analysis 
@@ -31,3 +34,16 @@ def princomp(A):
   latent = latent[idx] # sorting eigenvalues
   score = dot(coeff.T,M) # projection of the data in the new space
   return coeff,score,latent
+
+def princomp_tsvd(A,ncomp):
+  nt = A.shape[1]
+  tpca = sklearn.decomposition.TruncatedSVD(n_components=ncomp)
+  tpca.fit(A.T)
+  evalues  = tpca.explained_variance_
+  evectors = tpca.components_
+  proj = np.zeros((ncomp, nt))
+  for i in range(ncomp):
+    proj[i] = np.sum(evectors[i] * A.T, axis=1)
+  evectors = evectors.T
+
+  return evectors,proj,evalues
