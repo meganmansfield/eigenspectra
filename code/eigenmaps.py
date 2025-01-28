@@ -9,8 +9,9 @@
 
 import numpy as np
 from scipy.special import sph_harm
-import matplotlib.pyplot as p
+import matplotlib.pyplot as plt
 import pdb
+from matplotlib import rc
 
 def generate_maps(sph, N_lon, N_lat):
     '''
@@ -66,13 +67,9 @@ def generate_maps(sph, N_lon, N_lat):
 
     return wavelengths, lats, lons, fluxes
 
-def show_group_histos(input_map,lons,lats,kgroup_draws,
+def show_group_histos(savedir,numsamp,ngroups,extent,
                       xLons=[-0.5,-0.5,0.5, 0.5],
-                      xLats=[-0.5, 0.5,0.5,-0.5],
-                      alreadyTrimmed=True,
-                      lonsTrimmed=False,
-                      input_map_units='Mean Group',
-                      saveName=None,figsize=None):
+                      xLats=[-0.5, 0.5,0.5,-0.5]):
     """
     Show histograms of the groups for specific regions of the map
     
@@ -103,52 +100,56 @@ def show_group_histos(input_map,lons,lats,kgroup_draws,
         Is the longitude array already trimmed?
         If false, it will trim the longitude array
     """
-    
+    file=np.load(savedir+'eigenspectra_{}_draws_{}_groups.npz'.format(numsamp,ngroups),allow_pickle=True)
+    kgroup_draws=file['arr_1']
+
+    file2=np.load(savedir+'kgroups_{}_draws_{}_groups.npz'.format(numsamp,ngroups),allow_pickle=True)
+    input_map=file2['arr_0']
+    lats=file2['arr_1']
+    lons=file2['arr_2']
     
     londim = input_map.shape[1]
-    
-    fig, ax = p.subplots(figsize=figsize)
-    if alreadyTrimmed == True:
-        map_day = input_map
-    else:
-        map_day = input_map[:,londim//4:-londim//4]
-        
-    if lonsTrimmed == True:
-        useLons = lons
-    else:
-        useLons = lons[:,londim//4:-londim//4]
-    
-    plotData = ax.imshow(map_day, extent=[-90,90,-90,90])
-    cbar = fig.colorbar(plotData,ax=ax)
-    cbar.set_label(input_map_units)
-    ax.set_ylabel('Latitude')
-    ax.set_xlabel('Longitude')
-    
-    if figsize is None:
-        windowLocationsX = [-0.16,-0.16, 1.0, 1.0]
-        windowLocationsY = [ 0.1,  0.6 , 0.6, 0.1]
-    else:
-        windowLocationsX = [-0.26,-0.26, 1.1, 1.1]
-        windowLocationsY = [ 0.1,  0.7 , 0.7, 0.1]
-    
     windowLabels = ['A','B','C','D']
+    plotextent = np.array([np.min(lons[0,:])/np.pi*180,np.max(lons[0,:])/np.pi*180,np.min(lats[:,0])/np.pi*180,np.max(lats[:,0])/np.pi*180])
+    
+    rc('axes',linewidth=2)
+    plt.figure()
+    plotData = plt.imshow(input_map, extent=plotextent)
+    cbar = plt.colorbar(plotData)
+    cbar.set_label('Mean Group',fontsize=20)
+    cbar.ax.tick_params(labelsize=15,width=2,length=6)
     for ind in np.arange(len(xLons)):
         xLon, xLat = xLons[ind], xLats[ind]
-        left, bottom, width, height = [windowLocationsX[ind], windowLocationsY[ind], 0.2, 0.2]
-        ax2 = fig.add_axes([left, bottom, width, height])
-        iLon, iLat = np.argmin(np.abs(useLons[0,:] - xLon)), np.argmin(np.abs(lats[:,0] - xLat))
-        ax.text(useLons[0,iLon]* 180./np.pi,lats[iLat,0]* 180./np.pi,windowLabels[ind],
+        iLon, iLat = np.argmin(np.abs(lons[0,:] - xLon)), np.argmin(np.abs(lats[:,0] - xLat))
+        plt.text(lons[0,iLon]* 180./np.pi,lats[iLat,0]* 180./np.pi,windowLabels[ind],
                 color='red')
-        
-        ax2.set_title(windowLabels[ind])
-        ax2.set_xlabel('Group')
-        
-        ax2.hist(kgroup_draws[:,iLat,iLon])
-        ax2.set_xlim(-0.5,np.max(kgroup_draws) + 0.5)
-        ax2.set_xticks(np.arange(np.max(kgroup_draws) + 1))
-        
-    if saveName is not None:
-        fig.savefig(saveName,bbox_inches='tight')
-        
-    #fig.suptitle('Retrieved group map, n={}, {:.2f}$\mu$m'.format(degree,waves[waveInd]))
+    plt.ylabel('Latitude',fontsize=20)
+    plt.xlabel('Longitude',fontsize=20)
+    plt.tick_params(labelsize=20,width=2,length=8)
+    plt.savefig(savedir+'meangroup_{}_draws_{}_groups.pdf'.format(numsamp,ngroups))
+    plt.show()
+    
+    fig,axs=plt.subplots(2,2,figsize=(12,8),sharex=True,sharey=True)
+    for ind in np.arange(len(xLons)):
+        xLon, xLat = xLons[ind], xLats[ind]
+        # left, bottom, width, height = [windowLocationsX[ind], windowLocationsY[ind], 0.2, 0.2]
+        # ax2 = fig.add_axes([left, bottom, width, height])
+        iLon, iLat = np.argmin(np.abs(lons[0,:] - xLon)), np.argmin(np.abs(lats[:,0] - xLat))
+        p1=int(ind/2)
+        p2=int(ind-p1*2)
+        axs[p1][p2].hist(kgroup_draws[:,iLat,iLon])
+        axs[p1][p2].set_title(windowLabels[ind],fontsize=20)
+        axs[p1][p2].set_xlim(-0.5,np.max(kgroup_draws) + 0.5)
+        # axs[p1][p2].set_xlabel('Group',fontsize=20)
+        # axs[p1][p2].set_ylabel('# of Samples',fontsize=20)
+        axs[p1][p2].tick_params(labelsize=20,axis="both",top=True,right=True,width=2,length=8,direction='in')
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    plt.grid(False)
+    plt.xlabel("Group",fontsize=20)
+    plt.ylabel("# of Samples",fontsize=20,labelpad=30)
+    plt.savefig(savedir+'histos_{}_draws_{}_groups.pdf'.format(numsamp,ngroups))
+    plt.show()
+
+    return
 
