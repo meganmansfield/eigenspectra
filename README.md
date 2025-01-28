@@ -12,6 +12,6 @@ This code requires:
  - `starry`: <https://rodluger.github.io/starry/latest/>
  - `spiderman`: <https://spiderman.readthedocs.io/en/latest/>
  - `batman`: <https://astro.uchicago.edu/~kreidberg/batman/installation.html>
- - `colorcet`: <https://github.com/pyviz/colorcet>
- - `colorpy`: <https://pypi.org/project/colorpy/>
+ - 'cmasher': <https://cmasher.readthedocs.io/index.html>
+ - 'cartopy': <https://scitools.org.uk/cartopy/docs/latest/>
  

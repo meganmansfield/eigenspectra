@@ -1,4 +1,6 @@
 import numpy as np
+import pdb
+
 
 def bin_eigenspectra(maps, kgroup_draws, lats, lons, ngroups):
     '''
@@ -6,35 +8,55 @@ def bin_eigenspectra(maps, kgroup_draws, lats, lons, ngroups):
 
     Parameters
     ----------
-    maps : array of retrieved maps, units scaled Fp/Fs 
-        (axes: number of samples from fitting x wavelengths x latitude x longitude)
-    kgroup_draws : grouping for each retrieved map, unitless 
-        (axes: number of samples from fitting x latitude x longitude)
-    lats : array of latitude, units radians (axes: latitude x longitude)
-    lons : array of longitude, units radians (axes: latitude x longitude)
-    ngroups : number of groups to bin into, unitless
+    spectra : array of Fp/Fs (axes: wavelengths x lat x lon)
+    kgroups : array of group indices (ints) from 0 to k-1 (axes: lat x lon)
 
     Returns
     -------
-    integratedspec : spectra of each identified group, scaled to a full eclipse depth
-        as if that spectrum covered an entire dayside hemisphere. Units: Fp/Fs
-        (axes: number of groups x wavelength)
-    integratederr : error of each identified group, scaled to a full eclipse depth
-        as if that spectrum covered an entire dayside hemisphere. Units: Fp/Fs
-        (axes: number of groups x wavelength)
-    nearestint : array identifying the group each point was sorted into, unitless
-        (axes: latitude x longitude)
+    eigenspectra : list of k spectra, averaged over each group
     '''
 
-    #Find integer group each point is sorted into most frequently
-    kgroups = np.mean(kgroup_draws, axis=0)
-    nearestint= np.round(kgroups,decimals=0)
+    # Calculate the number of groups
+    # assuming kgroups contains integers from 0 to ngroups
+    # pdb.set_trace()
+    # ngroups = np.max(kgroups)+1
 
-    #Calculate mean and std of spectrum at each lat/long point
+    # nbins = spectra.shape[0]  # number of wavelength bins
+    # # spectra = spectra.reshape(nbins, -1)  # Flatten over (lat x lon)
+    # # kgroups = kgroups.reshape(-1)
+    # # pdb.set_trace()
+    # eigenspectra = []
+    # eigenlist = [[]]*ngroups
+    # centlon=0.
+    # centlat=0.
+    # dellat=np.diff(lats[:,0])[0]
+    # dellon=np.diff(lons[0,:])[0]
+    # centlat_sin = np.sin(centlat)
+    # centlat_cos = np.cos(centlat)
+    # vis = centlat_sin * np.sin(lats) + centlat_cos * np.cos(lats) * \
+    #         np.cos(lons - centlon)
+    # vis[vis <= 0.] = 0.
+    # for g in range(ngroups):
+    #     # ingroup = (kgroups == g).astype(int)
+    #     # eigenspec = np.sum(spectra*ingroup, axis=1)/np.sum(ingroup)
+    #     # # eigenspec is the mean of spectra in group
+    #     # eigenspectra.append(eigenspec)
+    #     # ingroups2 = (kgroups == g)
+    #     # eigenlist[g]=spectra[:,ingroups2]
+
+    #     #visibility weighting assuming center-of-eclipse (longitude=0,latitude=0 at central point)
+        
+    #     ingroup = np.where(kgroups==g)
+    #     # pdb.set_trace()
+    #     eigenspec = np.sum(spectra[:,ingroup[0],ingroup[1]] * vis[ingroup[0],ingroup[1]] \
+    #         * np.cos(lats[ingroup[0],ingroup[1]]),axis=1) * dellat * dellon
+    #     eigenspectra.append(eigenspec)
+    #     eigenlist[g]=spectra[:,ingroup[0],ingroup[1]]
+    # # pdb.set_trace()
+    kgroups = np.mean(kgroup_draws, axis=0)
     perpointspec = np.mean(maps,axis=0)
     perpointerr = np.std(maps,axis=0)
-    
-    #Use an area weighting to get mean spectrum of each group
+    nearestint= np.round(kgroups,decimals=0)
     nwaves=np.shape(maps)[1]
     eigenspec = np.zeros((ngroups,nwaves))
     eigenerr = np.zeros((ngroups,nwaves))
@@ -48,9 +70,9 @@ def bin_eigenspectra(maps, kgroup_draws, lats, lons, ngroups):
                 np.cos(lats[ingroup[0],ingroup[1]]),axis=1)/np.sum(np.cos(lats[ingroup[0],ingroup[1]]))
             eigenerr[g,:] = np.sum(perpointerr[:,ingroup[0],ingroup[1]] * \
                 np.cos(lats[ingroup[0],ingroup[1]]),axis=1)/np.sum(np.cos(lats[ingroup[0],ingroup[1]]))
+    
 
-    #integrate over full sphere to get spectra as if observing a full planet covered
-    #by that spectrum
+    #integrate over full sphere
     centlon=0.
     centlat=0.
     dellat=np.diff(lats[:,0])[0]
@@ -65,6 +87,11 @@ def bin_eigenspectra(maps, kgroup_draws, lats, lons, ngroups):
     for g in range(ngroups):
         integratedspec[g,:] = eigenspec[g,:]*np.sum(vis*np.cos(lats)) * dellat * dellon
         integratederr[g,:] = eigenerr[g,:]*np.sum(vis*np.cos(lats)) * dellat * dellon
+    fullplanetspec=np.zeros(nwaves)
+    fullplaneterr=np.zeros(nwaves)
+    for i in np.arange(nwaves):
+        fullplanetspec[i] = np.sum(perpointspec[i,:,:] * vis * np.cos(lats)) * dellat * dellon
+        fullplaneterr[i] = np.sum(perpointerr[i,:,:] * vis * np.cos(lats)) * dellat * dellon
 
-    return integratedspec,integratederr,nearestint
+    return integratedspec,integratederr,nearestint,fullplanetspec,fullplaneterr#eigenspectra,eigenlist
 
