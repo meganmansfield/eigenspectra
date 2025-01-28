@@ -47,36 +47,6 @@ def lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,non
 def neg_lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
 	return -lnprob(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True)
 
-def lnlike(theta,x,y,yerr,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs=True):
-	#Create model lightcurve and calculate likelihood
-	model = lightcurve_model(theta,elc,escore,nparams)
-	if nonegs:
-		isnegative,minval = check_negative(degree,theta,ecoeff,wavelength,extent)
-		if isnegative:
-			model = -np.ones(np.shape(y))#*minval
-	resid=y-model
-	chi2=np.sum((resid/yerr)**2)
-	dof=np.shape(y)[0]-1.
-	chi2red=chi2/dof
-	ln_likelihood=-0.5*(np.sum((resid/yerr)**2 + np.log(2.0*np.pi*(yerr)**2)))
-	return ln_likelihood
-
-def lnprior(theta):
-	lnpriorprob=0.
-	c0 = theta[0]
-	fstar = theta[1]
-	if fstar<0.:
-		lnpriorprob=-np.inf
-	elif c0<0.:
-		lnpriorprob=-np.inf
-	elif c0>1.:
-		lnpriorprob=-np.inf
-	elif fstar>2.:
-		lnpriorprob=-np.inf
-	for param in theta[2:]:
-		if abs(param)>1.:
-			lnpriorprob=-np.inf
-	return lnpriorprob
 
 def lightcurve_model(p,elc,escore,nparams):
 	#Compute light curve from model parameters
@@ -232,14 +202,9 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 				eclipsefluxes=fluxes[:,counter]*10.**-6.
 				eclipseerrors=errors[:,counter]*10.**-6.
 
-		#alltheoutput[counter,0]=wavelength
 
 		#	Calculate spherical harmonic maps using SPIDERMAN
-		lc,t = sh_lcs(t0=t0,per=per,a_abs=a_abs,inc=inc,ecc=ecc,w=planetw,rp=rprs,a=ars,ntimes=eclipsetimes,degree=degree)#degree=lmax+1)#	#model it for the times of the observations
-		# for i in range(16):
-		# 	plt.figure()
-		# 	plt.plot(t,lc[i,:])
-		# 	plt.show()
+		lc,t = sh_lcs(t0=t0,per=per,a_abs=a_abs,inc=inc,ecc=ecc,w=planetw,rp=rprs,a=ars,ntimes=eclipsetimes,degree=degree)	#model it for the times of the observations
 
 		# just analyze time around secondary eclipse (from start to end of observations)
 		starttime=np.min(eclipsetimes)
@@ -254,229 +219,230 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 		ecoeff,escore,elatent = princomp(elc[1:,:].T)
 		escore=np.real(escore)
 
-		if isinstance(afew,list):#np.shape(afew)[0]==10:
-			print('Gave an array of afew values')
-			if not np.shape(waves)[0]==np.shape(afew)[0]:
-				assert (np.shape(waves)[0]==np.shape(afew)[0]), "Array of afew values must be the same length as the number of wavelength bins, which is"+str(np.shape(waves)[0])
-			nparams=int(afew[counter]+2)
-		else:
-			if not isinstance(afew,int):
-				assert isinstance(afew,int), "afew must be an integer >=1!"
-			elif afew>=16:
-				print('Performing fit for best number of eigencurves to use.')
-				delbic=20.
-				nparams=4
-				params0=np.zeros(nparams)
-				params0[0]=0.0005
-				params0[1]=1.
-				params0[3]=0.0001
-				# print(check_negative(degree,params0,ecoeff,wavelength,extent))
-				# throwaway=makeplot(degree,params0,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-				# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
+		# if isinstance(afew,list):#np.shape(afew)[0]==10:
+		# 	print('Gave an array of afew values')
+		# 	if not np.shape(waves)[0]==np.shape(afew)[0]:
+		# 		assert (np.shape(waves)[0]==np.shape(afew)[0]), "Array of afew values must be the same length as the number of wavelength bins, which is"+str(np.shape(waves)[0])
+		# 	nparams=int(afew[counter]+2)
+		# else:
+		# 	if not isinstance(afew,int):
+		# 		assert isinstance(afew,int), "afew must be an integer >=1!"
+		# 	elif afew>=16:
+		# 		print('Performing fit for best number of eigencurves to use.')
+		# 		delbic=20.
+		# 		nparams=4
+		# 		params0=np.zeros(nparams)
+		# 		params0[0]=0.0005
+		# 		params0[1]=1.
+		# 		params0[3]=0.0001
+		# 		# print(check_negative(degree,params0,ecoeff,wavelength,extent))
+		# 		# throwaway=makeplot(degree,params0,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 		# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
 				
-				results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-					eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-					extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-				options={'maxiter':None})
-				fit_params = results.x
-				# resid=mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-				# throwaway=makeplot(degree,mpfit[0],ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-				# print(check_negative(degree,mpfit[0],ecoeff,wavelength,extent))
-				resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-				# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-				print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-				fit_params_old = params0
-				del_params = abs((fit_params_old-fit_params)/(fit_params))
-				print(np.max(del_params))
-				chi2i=np.sum((resid//eclipseerrors)**2.)
-				loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-				bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-				print(bicfit)
-				pdb.set_trace()
-				while any(del_params>0.01):
-					fit_params_old = fit_params
-					params0 = fit_params
-					results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-						eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-						extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-					options={'maxiter':None})
-					fit_params = results.x
-					resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-					# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-					print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-					del_params = abs((fit_params_old-fit_params)/(fit_params))
-					print(np.max(del_params))
-					chi2i=np.sum((resid//eclipseerrors)**2.)
-					loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-					bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-					print(bicfit)
-					pdb.set_trace()
-				pdb.set_trace()
-				tempparams=fit_params#mpfit[0]
-				bici=bicfit
-				#######FINDME: COMMENTING OUT EMCEE############
-				# theta = fit_params
-				# ndim=np.shape(theta)[0]	#set number of dimensions
-				# stepsize=0.001*theta
-				# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
-				# pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
-				# # print("Running MCMC at {} um".format(waves[counter]))
-				# sampler.run_mcmc(pos,nsteps,progress=True)
-				# try:
-				# 	print(sampler.get_autocorr_time())
-				# except:
-				# 	print('Could not estimate autocorrelation time.')
-				# samples = sampler.get_chain(discard=burnin,thin=int(np.floor(np.mean(sampler.get_autocorr_time()))),flat=True)
-				# bestfit=np.zeros(len(theta))
-				# for i in np.arange(ndim):
-				# 	bestfit[i]=quantile(samples[:,i],[0.5])[0]
-				# resid=mpmodel(bestfit,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-				# chi2i=np.sum((resid//eclipseerrors)**2.)
-				# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-				# bici=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-				# print(bestfit-fit_params)
-				# print(bicfit,bici,bicfit-bici)
-				# tempparams=bestfit
-				# pdb.set_trace()
+		# 		results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 			eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 			extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 		options={'maxiter':None})
+		# 		fit_params = results.x
+		# 		# resid=mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 		# throwaway=makeplot(degree,mpfit[0],ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 		# print(check_negative(degree,mpfit[0],ecoeff,wavelength,extent))
+		# 		resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 		# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 		print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 		fit_params_old = params0
+		# 		del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 		print(np.max(del_params))
+		# 		chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 		loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 		bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 		print(bicfit)
+		# 		pdb.set_trace()
+		# 		while any(del_params>0.01):
+		# 			fit_params_old = fit_params
+		# 			params0 = fit_params
+		# 			results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 				eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 				extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 			options={'maxiter':None})
+		# 			fit_params = results.x
+		# 			resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 			# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 			print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 			del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 			print(np.max(del_params))
+		# 			chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 			loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 			bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 			print(bicfit)
+		# 			pdb.set_trace()
+		# 		pdb.set_trace()
+		# 		tempparams=fit_params#mpfit[0]
+		# 		bici=bicfit
+		# 		#######FINDME: COMMENTING OUT EMCEE############
+		# 		# theta = fit_params
+		# 		# ndim=np.shape(theta)[0]	#set number of dimensions
+		# 		# stepsize=0.001*theta
+		# 		# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
+		# 		# pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
+		# 		# # print("Running MCMC at {} um".format(waves[counter]))
+		# 		# sampler.run_mcmc(pos,nsteps,progress=True)
+		# 		# try:
+		# 		# 	print(sampler.get_autocorr_time())
+		# 		# except:
+		# 		# 	print('Could not estimate autocorrelation time.')
+		# 		# samples = sampler.get_chain(discard=burnin,thin=int(np.floor(np.mean(sampler.get_autocorr_time()))),flat=True)
+		# 		# bestfit=np.zeros(len(theta))
+		# 		# for i in np.arange(ndim):
+		# 		# 	bestfit[i]=quantile(samples[:,i],[0.5])[0]
+		# 		# resid=mpmodel(bestfit,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 		# chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 		# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 		# bici=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 		# print(bestfit-fit_params)
+		# 		# print(bicfit,bici,bicfit-bici)
+		# 		# tempparams=bestfit
+		# 		# pdb.set_trace()
 
-				while delbic>biccut:#delbic>10.:
-					nparams+=1
-					if nparams==15:
-						params0=np.zeros(nparams)
-						params0[0]=0.0005
-						params0[1]=1.
-						params0[3]=0.0001
-						# print(check_negative(degree,params0,ecoeff,wavelength,extent))
-						# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
-						# chi2f=np.sum((mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)//eclipseerrors)**2.)
+		# 		while delbic>biccut:#delbic>10.:
+		# 			nparams+=1
+		# 			if nparams==15:
+		# 				params0=np.zeros(nparams)
+		# 				params0[0]=0.0005
+		# 				params0[1]=1.
+		# 				params0[3]=0.0001
+		# 				# print(check_negative(degree,params0,ecoeff,wavelength,extent))
+		# 				# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
+		# 				# chi2f=np.sum((mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)//eclipseerrors)**2.)
 						
-						results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-							eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-							extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-						options={'maxiter':None})
-						fit_params = results.x
-						resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-						# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-						print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-						fit_params_old = params0
-						del_params = abs((fit_params_old-fit_params)/(fit_params))
-						print(np.max(del_params))
-						while any(del_params>0.01):
-							fit_params_old = fit_params
-							params0 = fit_params
-							results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-								eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-								extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-							options={'maxiter':None})
-							fit_params = results.x
-							resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-							# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-							print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-							del_params = abs((fit_params_old-fit_params)/(fit_params))
-							print(np.max(del_params))
-						chi2f=np.sum((resid//eclipseerrors)**2.)
-						delbic=5.
-					else:
-						# pdb.set_trace()
-						params0=np.zeros(nparams)
-						params0[0]=0.0005
-						params0[1]=1.
-						params0[3]=0.0001
-						# print(check_negative(degree,params0,ecoeff,wavelength,extent))
-						# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
-						# resid=mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-						# throwaway=makeplot(degree,mpfit[0],ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-						# print(check_negative(degree,mpfit[0],ecoeff,wavelength,extent))
-						results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-							eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-							extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-						options={'maxiter':None})
-						fit_params = results.x
-						resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-						# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-						print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-						fit_params_old = params0
-						del_params = abs((fit_params_old-fit_params)/(fit_params))
-						print(np.max(del_params))
-						chi2i=np.sum((resid//eclipseerrors)**2.)
-						loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-						bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-						print(bicfit)
-						pdb.set_trace()
-						while any(del_params>0.01):
-							fit_params_old = fit_params
-							params0 = fit_params
-							results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
-								eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
-								extent,nonegs),method='Nelder-Mead',tol=1e-6,\
-							options={'maxiter':None})
-							fit_params = results.x
-							resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-							# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
-							print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
-							del_params = abs((fit_params_old-fit_params)/(fit_params))
-							print(np.max(del_params))
-							chi2i=np.sum((resid//eclipseerrors)**2.)
-							loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-							bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-							print(bicfit)
-							pdb.set_trace()
-						# chi2i=np.sum((resid//eclipseerrors)**2.)
-						# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-						# bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 				results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 					eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 					extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 				options={'maxiter':None})
+		# 				fit_params = results.x
+		# 				resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 				# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 				print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 				fit_params_old = params0
+		# 				del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 				print(np.max(del_params))
+		# 				while any(del_params>0.01):
+		# 					fit_params_old = fit_params
+		# 					params0 = fit_params
+		# 					results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 						eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 						extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 					options={'maxiter':None})
+		# 					fit_params = results.x
+		# 					resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 					# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 					print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 					del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 					print(np.max(del_params))
+		# 				chi2f=np.sum((resid//eclipseerrors)**2.)
+		# 				delbic=5.
+		# 			else:
+		# 				# pdb.set_trace()
+		# 				params0=np.zeros(nparams)
+		# 				params0[0]=0.0005
+		# 				params0[1]=1.
+		# 				params0[3]=0.0001
+		# 				# print(check_negative(degree,params0,ecoeff,wavelength,extent))
+		# 				# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs))
+		# 				# resid=mpmodel(mpfit[0],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 				# throwaway=makeplot(degree,mpfit[0],ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 				# print(check_negative(degree,mpfit[0],ecoeff,wavelength,extent))
+		# 				results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 					eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 					extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 				options={'maxiter':None})
+		# 				fit_params = results.x
+		# 				resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 				# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 				print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 				fit_params_old = params0
+		# 				del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 				print(np.max(del_params))
+		# 				chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 				loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 				bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 				print(bicfit)
+		# 				pdb.set_trace()
+		# 				while any(del_params>0.01):
+		# 					fit_params_old = fit_params
+		# 					params0 = fit_params
+		# 					results = minimize(neg_lnprob, params0, args=(eclipsetimes,eclipsefluxes,\
+		# 						eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,\
+		# 						extent,nonegs),method='Nelder-Mead',tol=1e-6,\
+		# 					options={'maxiter':None})
+		# 					fit_params = results.x
+		# 					resid=mpmodel(fit_params,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 					# throwaway=makeplot(degree,fit_params,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
+		# 					print(check_negative(degree,fit_params,ecoeff,wavelength,extent))
+		# 					del_params = abs((fit_params_old-fit_params)/(fit_params))
+		# 					print(np.max(del_params))
+		# 					chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 					loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 					bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 					print(bicfit)
+		# 					pdb.set_trace()
+		# 				# chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 				# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 				# bicfit=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 						
-						# pdb.set_trace()
+		# 				# pdb.set_trace()
 
-						#########FINDME: COMMENT OUT EMCEE
-						# theta = fit_params
-						# ndim=np.shape(theta)[0]	#set number of dimensions
-						# stepsize=0.001*theta
-						# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
-						# pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
-						# # print("Running MCMC at {} um".format(waves[counter]))
-						# sampler.run_mcmc(pos,nsteps,progress=True)
-						# try:
-						# 	print(sampler.get_autocorr_time())
-						# except:
-						# 	print('Could not estimate autocorrelation time.')
-						# samples = sampler.get_chain(discard=burnin,thin=int(np.floor(np.mean(sampler.get_autocorr_time()))),flat=True)
-						# bestfit=np.zeros(len(theta))
-						# for i in np.arange(ndim):
-						# 	bestfit[i]=quantile(samples[:,i],[0.5])[0]
-						# resid=mpmodel(bestfit,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-						# # chi2i=np.sum((resid//eclipseerrors)**2.)
-						# # loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-						# # bici=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-						# print(bestfit-fit_params)
-						# # tempparams=bestfit
+		# 				#########FINDME: COMMENT OUT EMCEE
+		# 				# theta = fit_params
+		# 				# ndim=np.shape(theta)[0]	#set number of dimensions
+		# 				# stepsize=0.001*theta
+		# 				# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
+		# 				# pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
+		# 				# # print("Running MCMC at {} um".format(waves[counter]))
+		# 				# sampler.run_mcmc(pos,nsteps,progress=True)
+		# 				# try:
+		# 				# 	print(sampler.get_autocorr_time())
+		# 				# except:
+		# 				# 	print('Could not estimate autocorrelation time.')
+		# 				# samples = sampler.get_chain(discard=burnin,thin=int(np.floor(np.mean(sampler.get_autocorr_time()))),flat=True)
+		# 				# bestfit=np.zeros(len(theta))
+		# 				# for i in np.arange(ndim):
+		# 				# 	bestfit[i]=quantile(samples[:,i],[0.5])[0]
+		# 				# resid=mpmodel(bestfit,eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 				# # chi2i=np.sum((resid//eclipseerrors)**2.)
+		# 				# # loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 				# # bici=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 				# print(bestfit-fit_params)
+		# 				# # tempparams=bestfit
 
-						# chi2f=np.sum((resid//eclipseerrors)**2.)
-						# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-						# bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-						# delbic=bici-bicf
-						delbic=bici-bicfit
-						print(bicfit)#,bicf,bicfit-bicf)
-						#print(np.sum((resid//eclipseerrors)**2),loglike)
-						#print(chi2i,chi2f,bici,bicf)
-						print(nparams-2,bici-bicf,bici,bicf)#,chi2f-chi2i,bicf-bici)
-						print(bestfit)#(mpfit[0])
-						print(bestfit[:-1]-tempparams)#(mpfit[0][:-1]-tempparams)
-						# pdb.set_trace()
-						chi2i=chi2f
-						bici=bicf
-						tempparams=bestfit#fit_params#mpfit[0]
-						pdb.set_trace()
-				print('BIC criterion says the best number of eigencurves to use is '+str(nparams-3))
+		# 				# chi2f=np.sum((resid//eclipseerrors)**2.)
+		# 				# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 				# bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# 				# delbic=bici-bicf
+		# 				delbic=bici-bicfit
+		# 				print(bicfit)#,bicf,bicfit-bicf)
+		# 				#print(np.sum((resid//eclipseerrors)**2),loglike)
+		# 				#print(chi2i,chi2f,bici,bicf)
+		# 				print(nparams-2,bici-bicf,bici,bicf)#,chi2f-chi2i,bicf-bici)
+		# 				print(bestfit)#(mpfit[0])
+		# 				print(bestfit[:-1]-tempparams)#(mpfit[0][:-1]-tempparams)
+		# 				# pdb.set_trace()
+		# 				chi2i=chi2f
+		# 				bici=bicf
+		# 				tempparams=bestfit#fit_params#mpfit[0]
+		# 				pdb.set_trace()
+		# 		print('BIC criterion says the best number of eigencurves to use is '+str(nparams-3))
 
-				# pdb.set_trace()
-				nparams-=1	#need this line back when I change back again
+		# 		# pdb.set_trace()
+		# 		nparams-=1	#need this line back when I change back again
 			
-			elif ((afew<16)&(afew>=1)):
-				nparams=int(afew+2)
+		# 	elif ((afew<16)&(afew>=1)):
+		# 		nparams=int(afew+2)
 
-			else:	#assert afew is an integer here
-				assert afew>1 ,"afew must be an integer 1<=afew<=15!"
+		# 	else:	#assert afew is an integer here
+		# 		assert afew>1 ,"afew must be an integer 1<=afew<=15!"
 
+		nparams=int(afew+2)
 		params0=np.zeros(nparams)
 		params0[0]=0.0005
 		params0[1]=1.
@@ -511,7 +477,7 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 		bici=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 		print(bici)
 		bicf=bici
-		pdb.set_trace()
+		# pdb.set_trace()
 		while any(del_params>0.01):
 			bici=bicf
 			fit_params_old = fit_params
@@ -530,13 +496,13 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 			loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
 			bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 			print(bicf)
-			pdb.set_trace()
+			# pdb.set_trace()
 		# pdb.set_trace()
 		# chi2i=np.sum((resid//eclipseerrors)**2.)
 		# loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
 		bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
-		tempparams=fit_params#mpfit[0]
-		bici=bicf
+		bestcoeffs=fit_params#mpfit[0]
+		# bici=bicf
 		# ndim=np.shape(theta)[0]	#set number of dimensions
 		# stepsize=0.001*theta
 		# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
@@ -548,29 +514,29 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 		# except:
 		# 	print('Could not estimate autocorrelation time.')
 		
-		theta=fit_params#mpfit[0]
-		print(theta)
-		ndim=np.shape(theta)[0]	#set number of dimensions
-		stepsize=0.001*theta #0.001
-		sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
-		pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
-		print("Running MCMC at {} um".format(waves[counter]))
+		# theta=fit_params#mpfit[0]
+		# print(theta)
+		# ndim=np.shape(theta)[0]	#set number of dimensions
+		# stepsize=0.001*theta #0.001
+		# sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(eclipsetimes,eclipsefluxes,eclipseerrors,elc,escore,nparams,degree,ecoeff,wavelength,extent,nonegs),pool=mp.Pool(5))
+		# pos = [theta + stepsize*np.random.randn(ndim) for i in range(nwalkers)]
+		# print("Running MCMC at {} um".format(waves[counter]))
 
-		bestfit=np.zeros(ndim+1)
-		bestfit[0]=10.**8
+		# bestfit=np.zeros(ndim+1)
+		# bestfit[0]=10.**8
 
-		burnin=0
-		nsteps=300
-		for i, result in enumerate(sampler.sample(pos, iterations=nsteps,progress=True)):
-			if i>burnin:
-				for guy in np.arange(nwalkers):
-					resid=mpmodel(result.coords[guy],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
-					chi2val=np.sum((resid//eclipseerrors)**2.)
-					if chi2val<bestfit[0]:
-						bestfit[0]=chi2val
-						bestfit[1:]=result.coords[guy]
-						loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
-						bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
+		# burnin=0
+		# nsteps=300
+		# for i, result in enumerate(sampler.sample(pos, iterations=nsteps,progress=True)):
+		# 	if i>burnin:
+		# 		for guy in np.arange(nwalkers):
+		# 			resid=mpmodel(result.coords[guy],eclipsetimes,eclipsefluxes,eclipseerrors,elc,np.array(escore),nparams,degree,ecoeff,wavelength,extent,nonegs)
+		# 			chi2val=np.sum((resid//eclipseerrors)**2.)
+		# 			if chi2val<bestfit[0]:
+		# 				bestfit[0]=chi2val
+		# 				bestfit[1:]=result.coords[guy]
+		# 				loglike=-0.5*(np.sum((resid//eclipseerrors)**2 + np.log(2.0*np.pi*(eclipseerrors)**2)))
+		# 				bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 		# sampler.run_mcmc(pos,nsteps,progress=True)
 
 
@@ -591,11 +557,11 @@ def eigencurves(dict,planetparams,plot=False,degree=3,afew=5,burnin=100,nsteps=1
 		# tbicf=-2.*tloglike + nparams*np.log(np.shape(eclipseerrors)[0])
 		print(bici,bicf,bici-bicf)
 		# print(bici,tbicf,bici-tbicf)
-		pdb.set_trace()
+		# pdb.set_trace()
 		# fullchain=sampler.chain
 		# # fullchainarray.append(fullchain)
 
-		bestcoeffs=bestfit[1:]
+		# bestcoeffs=bestfit[1:]
 		# bestcoeffs=fit_params
 
 		#make an eclipse lightcurve for one wavelength
