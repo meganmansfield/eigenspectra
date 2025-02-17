@@ -184,11 +184,11 @@ def eigencurves(dict,planetparams,fitfile,plot=False,degree=3,afew=5,burnin=100,
 	#read in prefit info
 	tmp=np.load(fitfile+'/prefit.npz',encoding='latin1',allow_pickle=True)
 	firstfits=tmp['arr_0'].tolist()
-	pdb.set_trace()
+	# pdb.set_trace()
 	prefit_bestcoeffs=firstfits['bestcoeffs']
 	prefit_degmin=firstfits['degmin']
 	prefit_eigenmin=firstfits['eigenmin']
-	pdb.set_trace()
+	# pdb.set_trace()
 
 	extent=np.zeros(2)
 	extent[0]=(np.min(times)-t0)/per*2.*np.pi-np.pi/2.-np.pi
@@ -324,7 +324,7 @@ def eigencurves(dict,planetparams,fitfile,plot=False,degree=3,afew=5,burnin=100,
 						print(nparams-2,bici-bicf)#,chi2f-chi2i,bicf-bici)
 						print(mpfit[0])
 						print(mpfit[0][:-1]-tempparams)
-						pdb.set_trace()
+						# pdb.set_trace()
 						chi2i=chi2f
 						bici=bicf
 						tempparams=mpfit[0]
@@ -344,12 +344,12 @@ def eigencurves(dict,planetparams,fitfile,plot=False,degree=3,afew=5,burnin=100,
 		# params0[1]=1.
 		# pdb.set_trace()
 		# firstfits=np.loadtxt(fitfile+'/prefit.npz')
-		params0=prefit_bestcoeffs[counter,(tempdeg-prefit_degmin),(nparams-4-prefit_eigenmin),:nparams]
+		params0=prefit_bestcoeffs[counter,(tempdeg-prefit_degmin),(nparams-2-prefit_eigenmin),:nparams]
 		stepsize=params0*0.001
-		pdb.set_trace()
+		# pdb.set_trace()
 		# print(check_negative(degree,params0,ecoeff,wavelength,extent))
 		# mpfit=leastsq(mpmodel,params0,args=(eclipsetimes,eclipsefluxes[0],eclipseerrors[0],elc,np.array(escore),nparams,tempdeg,ecoeff,wavelength,extent,nonegs))
-		# throwaway=makeplot(tempdeg,params0,ecoeff,planetparams,eclipsetimes,eclipsefluxes[0],eclipseerrors[0])
+		# throwaway=makeplot(tempdeg,params0,ecoeff,planetparams,eclipsetimes,eclipsefluxes,eclipseerrors)
 		# print(check_negative(degree,mpfit[0],ecoeff,wavelength,extent))
 		#format parameters for mcmc fit
 		# pdb.set_trace()
