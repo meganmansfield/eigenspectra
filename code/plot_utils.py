@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rc
+
 
 import eigenmaps
 import kmeans
@@ -327,16 +329,18 @@ def plot_retrieved_map(datadir,waves,extent,minflux,maxflux,waveInd=3,saveName=N
         lons=alldict['arr_2']
         lats=alldict['arr_1']
         goodplot=np.where((lons[0,:]>extent[0])&(lons[0,:]<extent[1]))[0]
+		#vis = calc_contribution(lats[:,goodplot],lons[:,goodplot])
+        vis = calc_contribution_allang(lats[:,goodplot],lons[:,goodplot],-np.pi,np.pi)
+        print(vis)
         mapLowMedHigh=np.percentile(fullMapArray,percentiles,axis=0)
         mapLowMedHigh[1,:,:]=bestMapArray
-        rc('axes',linewidth=2)
+        plt.rc('axes',linewidth=2)
         fig=plt.figure(figsize=(10,6.5))
         ax=plt.axes([0.1,0.35,0.8,0.6],projection=ccrs.Robinson())
         # plt.figure()
         map_day = mapLowMedHigh[1][:,goodplot]
         plotextent = np.array([np.min(lons[0,goodplot])/np.pi*180,np.max(lons[0,goodplot])/np.pi*180,np.min(lats[:,0])/np.pi*180,np.max(lats[:,0])/np.pi*180])
         # plotData = plt.imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux)
-        vis = calc_contribution(lats[:,goodplot],lons[:,goodplot])
         plotData = ax.imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux, alpha=vis, transform=ccrs.PlateCarree(),cmap='inferno')
         # cbar = plt.colorbar(plotData)
         plt.title('Wavelength={:0.2f} $\mu$m'.format(waves[waveInd]),fontsize=15)
@@ -345,7 +349,7 @@ def plot_retrieved_map(datadir,waves,extent,minflux,maxflux,waveInd=3,saveName=N
         gl.ylabel_style = {'size': 15, 'color': 'k'}
         # plt.ylabel('Latitude',fontsize=20)
         # plt.xlabel('Longitude',fontsize=20)
-        rc('axes',linewidth=1)
+        plt.rc('axes',linewidth=1)
         a = plt.axes([0.2,0.1,0.6,0.15])
         # a.yaxis.set_visible(False)
         # a.xaxis.set_visible(False)
@@ -401,24 +405,32 @@ def plot_retrieved_map(datadir,waves,extent,minflux,maxflux,waveInd=3,saveName=N
             lats=alldict['arr_1']
             singlewave=np.round(alldict['arr_0'],decimals=2)
             goodplot=np.where((lons[0,:]>extent[0])&(lons[0,:]<extent[1]))[0]
-            mapLowMedHigh=np.percentile(fullMapArray,percentiles,axis=0)
-            mapLowMedHigh[1,:,:]=bestMapArray
+            #vis = calc_contribution(lats[:,goodplot],lons[:,goodplot])
+            vis = calc_contribution_allang(lats[:,goodplot],lons[:,goodplot],-np.pi,np.pi)            
+			#comment out percentile parts for quicker running for troubleshooting
+            # start = time.time()
+            # mapLowMedHigh=np.percentile(fullMapArray,percentiles,axis=0)
+            # mapLowMedHigh[1,:,:]=bestMapArray
+            # end = time.time()
+            # length = end - start
+            # print('Finding Percentiles took', length, 'seconds')
+            # map_day = mapLowMedHigh[1][:,goodplot]
             # rc('axes',linewidth=2)
             # plt.figure()
-            rc('axes',linewidth=2)
+            map_day = bestMapArray
+            plt.rc('axes',linewidth=2)
             fig=plt.figure(figsize=(10,6.5))
             ax=plt.axes([0.1,0.35,0.8,0.6],projection=ccrs.Robinson())  
-            map_day = mapLowMedHigh[1][:,goodplot]
             plotextent = np.array([np.min(lons[0,goodplot])/np.pi*180,np.max(lons[0,goodplot])/np.pi*180,np.min(lats[:,0])/np.pi*180,np.max(lats[:,0])/np.pi*180])
-            vis = calc_contribution(lats[:,goodplot],lons[:,goodplot])
-            plotData = ax.imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux, alpha=vis, transform=ccrs.PlateCarree(),cmap='inferno')
+            # plotData = ax.imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux, alpha=vis, transform=ccrs.PlateCarree(),cmap='inferno')
+            plotData = ax.imshow(map_day, vmin=minflux,vmax=maxflux, alpha=vis, transform=ccrs.PlateCarree(),cmap='inferno')
             # plotData = plt.imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux)
             plt.title('Wavelength={:0.2f} $\mu$m'.format(singlewave),fontsize=15)
             gl=ax.gridlines(crs=ccrs.PlateCarree(),draw_labels=True)
             gl.xlabel_style = {'size': 15, 'color': 'k'}
             gl.ylabel_style = {'size': 15, 'color': 'k'}
 
-            rc('axes',linewidth=1)
+            plt.rc('axes',linewidth=1)
             a = plt.axes([0.2,0.1,0.6,0.15])
             colorbardata=np.zeros((100,100))
             colorbaralpha=np.zeros((100,100))
@@ -443,22 +455,24 @@ def plot_retrieved_map(datadir,waves,extent,minflux,maxflux,waveInd=3,saveName=N
             plt.savefig(datadir+'/retrieved_maps/retrieved_map_{}_wave_{}.pdf'.format(saveName,singlewave))
             plt.show()
 
-            fig, axArr = plt.subplots(1,3,figsize=(22,5))
-            for ind,onePercentile in enumerate(percentiles):
-                map_day = mapLowMedHigh[ind][:,goodplot]
-                plotData = axArr[ind].imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux,cmap='inferno')
-                axArr[ind].set_ylabel('Latitude')
-                axArr[ind].set_xlabel('Longitude')
-                axArr[ind].set_title("{} %".format(onePercentile))
-            fig.suptitle('{:.2f}$\mu$m'.format(singlewave),fontsize=20)
-            fig.subplots_adjust(right=0.8)
-            cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
-            cbar = fig.colorbar(plotData, cax=cbar_ax)
-            cbar.set_label('Brightness')
-            plt.savefig(datadir+'/retrieved_maps/retrieved_3_maps_{}_wave_{}.pdf'.format(saveName,singlewave))
-            plt.show()
+            # fig, axArr = plt.subplots(1,3,figsize=(22,5))
+            # for ind,onePercentile in enumerate(percentiles):
+            #     map_day = mapLowMedHigh[ind][:,goodplot]
+            #     plotData = axArr[ind].imshow(map_day, extent=plotextent,vmin=minflux,vmax=maxflux,cmap='inferno')
+            #     axArr[ind].set_ylabel('Latitude')
+            #     axArr[ind].set_xlabel('Longitude')
+            #     axArr[ind].set_title("{} %".format(onePercentile))
+            # fig.suptitle('{:.2f}$\mu$m'.format(singlewave),fontsize=20)
+            # fig.subplots_adjust(right=0.8)
+            # cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+            # cbar = fig.colorbar(plotData, cax=cbar_ax)
+            # cbar.set_label('Brightness')
+            # plt.savefig(datadir+'/retrieved_maps/retrieved_3_maps_{}_wave_{}.pdf'.format(saveName,singlewave))
+            # plt.show()
 
-    return mapLowMedHigh#, mintemp, maxtemp
+    # return mapLowMedHigh#, mintemp, maxtemp
+    return map_day#, mintemp, maxtemp
+    
 
 def calc_contribution(lats,lons):
     centlon=0.
@@ -643,7 +657,7 @@ def plot_map_in_temp(datadir,savepath,waves,dlam,rprs,extent,waveInd=0,saveName=
         maxtemp=np.max(mapintemp[:,:,np.min(goodplot):np.max(goodplot)+1])
         mintemp=np.min(mapintemp[:,:,np.min(goodplot):np.max(goodplot)+1])
 
-        rc('axes',linewidth=2)
+        plt.rc('axes',linewidth=2)
         fig=plt.figure(figsize=(10,6.5))
         ax=plt.axes([0.1,0.35,0.8,0.6],projection=ccrs.Robinson()) 
         plotextent = np.array([np.min(lons[0,goodplot])/np.pi*180,np.max(lons[0,goodplot])/np.pi*180,np.min(lats[:,0])/np.pi*180,np.max(lats[:,0])/np.pi*180])
@@ -656,7 +670,7 @@ def plot_map_in_temp(datadir,savepath,waves,dlam,rprs,extent,waveInd=0,saveName=
         gl.xlabel_style = {'size': 15, 'color': 'k'}
         gl.ylabel_style = {'size': 15, 'color': 'k'}
 
-        rc('axes',linewidth=1)
+        plt.rc('axes',linewidth=1)
         a = plt.axes([0.2,0.1,0.6,0.15])
         colorbardata=np.zeros((100,100))
         colorbaralpha=np.zeros((100,100))
@@ -760,7 +774,7 @@ def plot_map_in_temp(datadir,savepath,waves,dlam,rprs,extent,waveInd=0,saveName=
             singlewave=alldict['arr_0']
             mapintemp=alldict['arr_3']
 
-            rc('axes',linewidth=2)
+            plt.rc('axes',linewidth=2)
             fig=plt.figure(figsize=(10,6.5))
             ax=plt.axes([0.1,0.35,0.8,0.6],projection=ccrs.Robinson()) 
             plotextent = np.array([np.min(lons[0,goodplot])/np.pi*180,np.max(lons[0,goodplot])/np.pi*180,np.min(lats[:,0])/np.pi*180,np.max(lats[:,0])/np.pi*180])
@@ -771,7 +785,7 @@ def plot_map_in_temp(datadir,savepath,waves,dlam,rprs,extent,waveInd=0,saveName=
             gl.xlabel_style = {'size': 15, 'color': 'k'}
             gl.ylabel_style = {'size': 15, 'color': 'k'}
             
-            rc('axes',linewidth=1)
+            plt.rc('axes',linewidth=1)
             a = plt.axes([0.2,0.1,0.6,0.15])
             colorbardata=np.zeros((100,100))
             colorbaralpha=np.zeros((100,100))
@@ -813,11 +827,13 @@ def calc_instrument_throughput(instr,waves,order=1):
     #Calculate instrument throughput using pandeia, but here just downloading a fixed file
     #Only works for NIRISS SOSS right now - would need to add other instruments
     # from pandeia.engine.instrument_factory import InstrumentFactory
-
-    if instr == 'NIRISS':
-        if order == 1:
-            throughputfile = np.loadtxt('./throughputs/niriss_order1.txt')
-            throughput = np.interp(waves,throughputfile[:,0],throughputfile[:,1])
+    throughputfile = np.loadtxt('./throughputs/miri_lrs.txt')
+    throughput = np.interp(waves,throughputfile[:,0],throughputfile[:,1])
+	# throughput = np.interp(waves,throughputfile[:,0],throughputfile[:,1])
+	#     if instr == 'NIRISS':
+	#         if order == 1:
+	#             throughputfile = np.loadtxt('./throughputs/niriss_order1.txt')
+	#             throughput = np.interp(waves,throughputfile[:,0],throughputfile[:,1])
     #     conf={"detector": {"nexp": 1,"ngroup": 10,"nint": 1,"readout_pattern": "nisrapid","subarray": "substrip96"},
     # "dynamic_scene": False,"instrument": {"aperture": "soss","disperser": "gr700xd","filter": "clear","instrument": "niriss","mode": "soss"},}
 
@@ -825,7 +841,6 @@ def calc_instrument_throughput(instr,waves,order=1):
     # if instr == 'NIRISS':
     #     instrument_factory.order = 1
     # throughput = instrument_factory.get_total_eff(waves)
-
     return throughput
 
 def find_hotspot(outputpath,waves,min_lon,max_lon,step_size,waveInd=3,saveName=None):
@@ -895,8 +910,10 @@ def find_hotspot(outputpath,waves,min_lon,max_lon,step_size,waveInd=3,saveName=N
                 hotlats[i]=lats[hottestpoint[0],hottestpoint[1]]*180./np.pi
                 hotlons[i]=lons[hottestpoint[0],hottestpoint[1]]*180./np.pi
             bestpoint=np.unravel_index(bestmap.argmax(),bestmap.shape)
+            print(bestpoint)
             bestlat=lats[bestpoint[0],bestpoint[1]]*180./np.pi 
             bestlon=lons[bestpoint[0],bestpoint[1]]*180./np.pi
+            print(bestlon)
             # pdb.set_trace()
 
             latsigma[counter,:]=np.percentile(hotlats,percentiles)

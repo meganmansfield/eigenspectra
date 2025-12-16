@@ -311,7 +311,7 @@ def eigencurves(dict,planetparams,homedir,ordmin=3,ordmax=6,eigenmin=2,eigenmax=
 				
 				bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 				bestcoeffs=fit_params
-
+				print(bestcoeffs)
 				#print(bici,bicf,bici-bicf)
 				biclist[counter,degnum-ordmin,eigennum-eigenmin]=bicf
 				bestcoefflist[counter,degnum-ordmin,eigennum-eigenmin,:nparams]=bestcoeffs
