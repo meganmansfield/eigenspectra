@@ -311,7 +311,7 @@ def eigencurves(dict,planetparams,homedir,ordmin=3,ordmax=6,eigenmin=2,eigenmax=
 				
 				bicf=-2.*loglike + nparams*np.log(np.shape(eclipseerrors)[0])
 				bestcoeffs=fit_params
-
+				print(bestcoeffs)
 				#print(bici,bicf,bici-bicf)
 				biclist[counter,degnum-ordmin,eigennum-eigenmin]=bicf
 				bestcoefflist[counter,degnum-ordmin,eigennum-eigenmin,:nparams]=bestcoeffs
@@ -375,7 +375,7 @@ def eigencurves(dict,planetparams,homedir,ordmin=3,ordmax=6,eigenmin=2,eigenmax=
 		eigenbest[counter]=eigenmin+bestindex[1]
 
 		plt.figure()
-		plt.imshow(biclist[counter]-np.min(biclist[counter]),extent=[eigenmin-0.5,eigenmax+0.5,ordmax+0.5,ordmin-0.5])
+		plt.imshow(biclist[counter]-np.min(biclist[counter]),extent=[eigenmin-0.5,eigenmax+0.5,ordmax+0.5,ordmin-0.5],vmax=100)
 		plt.colorbar()
 		plt.title('$\Delta$BIC, wave='+str(wavelength))
 		plt.xlabel('Number of Eigencurves')
